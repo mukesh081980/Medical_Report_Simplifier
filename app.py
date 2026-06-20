@@ -72,6 +72,7 @@ if uploaded_file:
 
     if st.button("Simplify Report"):
         text = text[:12000]
+
         prompt = f"""
 You are an AI Medical Report Simplifier.
 
@@ -119,24 +120,16 @@ Use bullet points wherever possible.
 
 At the end, write:
 
-⚠️ This explanation is for educational purposes only. Please consult a qualified doctor.
+⚠️ This explanation is for educational purposes only.
 """
 
-       try:
-    with st.spinner("⏳ Analyzing your medical report..."):
-        text = text[:12000]  # Limit report size to avoid timeout
-
         try:
-    with st.spinner("⏳ Analyzing your medical report..."):
-        response = model.generate_content(prompt)
+            with st.spinner("⏳ Analyzing your medical report..."):
+                response = model.generate_content(prompt)
 
-except Exception as e:
-    st.error(f"Gemini Error: {e}")
-    st.stop()
-
-except Exception as e:
-    st.error(f"Gemini Error: {e}")
-    st.stop()
+        except Exception as e:
+            st.error(f"Gemini Error: {e}")
+            st.stop()
 
         st.subheader("AI Explanation")
         st.write(response.text)

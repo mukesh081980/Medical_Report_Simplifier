@@ -4,14 +4,16 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 import os
 from io import BytesIO
+from xml.sax.saxutils import escape
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 
 load_dotenv()
 
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-
 model = genai.GenerativeModel("gemini-2.5-flash")
+
+
 def create_pdf(report_text):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer)
@@ -25,13 +27,16 @@ def create_pdf(report_text):
         line = line.replace("##", "")
         line = line.replace("**", "")
         line = line.replace("*", "•")
-        story.append(Paragraph(line, styles["Normal"]))
-        story.append(Spacer(1, 6))
+        line = escape(line)
+
+        if line.strip():
+            story.append(Paragraph(line, styles["Normal"]))
+            story.append(Spacer(1, 6))
 
     doc.build(story)
     buffer.seek(0)
     return buffer
-    return buffer
+
 
 st.title("🏥 AI Medical Report Simplifier")
 
@@ -58,96 +63,84 @@ if uploaded_file:
     for page in reader.pages:
         page_text = page.extract_text()
         if page_text:
-            text += page_text
+            text += page_text + "\n"
 
     st.success("✅ PDF uploaded successfully!")
 
     with st.expander("📄 View Extracted Text (Optional)"):
         st.text_area("Report Content", text, height=300)
-        if st.button("Simplify Report"):
-            prompt = f"""
-            
-        You are an AI Medical Report Simplifier.
 
-        Explain this medical report in very simple English.
+    if st.button("Simplify Report"):
+        text = text[:12000]
 
-        Report:
-        {text}
+        prompt = f"""
+You are an AI Medical Report Simplifier.
 
-        Give the answer in this exact format:
+Explain this medical report in very simple English.
 
-        1. Summary
-        Explain the overall report in simple words.
+Report:
+{text}
 
-        2. Abnormal Values
-        List only abnormal or important values.
+Give the answer in this exact format:
 
-        3. What It Means
-        Explain what those abnormal values may indicate.
+## Summary
+Explain the overall report in simple words.
 
-        4. Precautions
-        Give simple health precautions.
+## Abnormal Values
+List only abnormal or important values.
 
-        5. Diet Suggestions
-        Give food suggestions.
+## What It Means
+Explain what those abnormal values may indicate.
 
-        6. Lifestyle Suggestions
-        Give daily life suggestions.
+## Precautions
+Give simple health precautions.
 
-        7. Questions to Ask Doctor
-        Give 5 questions the patient should ask the doctor.
+## Diet Suggestions
+Give food suggestions.
 
-        Important Rules:
+## Lifestyle Suggestions
+Give daily life suggestions.
 
-        Use Markdown headings.
+## Questions to Ask Your Doctor
+Give 5 questions the patient should ask the doctor.
 
-        Format your answer exactly like this:
+## Health Score (VERY IMPORTANT)
 
-        ## Summary
+At the end of your response, you MUST include:
 
-        ## Abnormal Values
+Overall Health Score: __ / 100
 
-        ## What It Means
+Risk Level:
+🟢 Healthy
+🟡 Needs Attention
+🔴 Critical
 
-        ## Precautions
+Choose ONLY ONE risk level based on the medical report.
+Use bullet points wherever possible.
 
-        ## Diet Suggestions
+At the end, write:
 
-        ## Lifestyle Suggestions
+⚠️ This explanation is for educational purposes only.
+"""
 
-        ## Questions to Ask Your Doctor
-        ## Health Score (VERY IMPORTANT)
-
-        At the end of your response, you MUST include:
-
-        Overall Health Score: __ / 100
-
-        Risk Level:
-        🟢 Healthy
-        🟡 Needs Attention
-        🔴 Critical
-
-        Choose ONLY ONE risk level based on the medical report.
-        Use bullet points wherever possible.
-
-        At the end, write:
-
-            ⚠️ This explanation is for educational purposes only. Please consult a qualified doctor.
-            """
-
+        try:
+            with st.spinner("⏳ Analyzing your medical report..."):
                 response = model.generate_content(prompt)
 
-                st.subheader("AI Explanation")
-            st.write(response.text)
-            st.success("✅ Report simplified successfully!")
-            st.markdown("---")
+        except Exception as e:
+            st.error(f"Gemini Error: {e}")
+            st.stop()
 
-            pdf_file = create_pdf(response.text)
+        st.subheader("AI Explanation")
+        st.write(response.text)
+        st.success("✅ Report simplified successfully!")
+        st.markdown("---")
 
-            st.download_button(
-                label="📥 Download Simplified Report as PDF",
-                data=pdf_file,
-                file_name="simplified_medical_report.pdf",
-                mime="application/pdf",
-            )
-    
+        pdf_file = create_pdf(response.text)
+
+        st.download_button(
+            label="📥 Download Simplified Report as PDF",
+            data=pdf_file,
+            file_name="simplified_medical_report.pdf",
+            mime="application/pdf",
+        )
